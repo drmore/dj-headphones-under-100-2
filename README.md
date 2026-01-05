@@ -1,19 +1,19 @@
-# All DJ headphones under $100 — lowest price first (No-API mode)
+# DJ headphones shortlist (No-API, human-friendly)
 
-This repo runs **without Amazon PA-API access**. It publishes a GitHub Pages site that:
-- links to a curated list of DJ headphone products (by ASIN)
-- includes an Amazon search link filtered to **under $100** and sorted **price low→high**
-- rebuilds once per day via GitHub Actions
+This version is intentionally **human-readable** without Amazon PA-API access.
 
-## Why no prices?
-Amazon requires Product Advertising API access to display live prices programmatically. Until PA-API is enabled on your Associates account, this site does not show prices on-page. Users click through to see the current price on Amazon.
+## What you can show (compliant)
+- Product name (manual)
+- One-line summary (manual)
+- Typical price range (manual)
+- Optional image URL (ONLY if you have rights to use the image)
 
-## One-time setup
-1. Put your ASINs in `asin_list.json` (already included).
-2. Add one GitHub Actions secret:
-   - `AMZ_PARTNER_TAG` (your tracking ID, e.g. `yourtag-20`)
-3. Enable GitHub Pages (Deploy from branch → main → /root).
-4. Run the workflow once.
+## What you should NOT do without PA-API
+- Scrape Amazon for titles/images/prices
+- Hotlink/copy Amazon images without permission
 
-## Switching to PA-API later
-When you gain PA-API access, we can swap to the PA-API version to display live prices and truly sort cheapest-first on-page.
+## Update content
+Edit `asin_list.json` and fill in `name`, `summary`, `price_range`.
+Optionally add `image_url` if you have a licensed image.
+
+Then run the GitHub Action (workflow_dispatch) or wait for daily rebuild.

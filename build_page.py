@@ -3,21 +3,21 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import List, Dict
+from urllib.parse import quote_plus
 
-
-PAGE_TITLE = "All DJ headphones under $100 — lowest price first"
+PAGE_TITLE = "DJ headphones under $100 — shortlist"
 PAGE_DESC = (
-    "Curated list of DJ headphones commonly priced under $100 on Amazon US. "
-    "Because Product Advertising API access is not enabled yet, this page does not display live prices. "
-    "Use the buttons to view current prices on Amazon."
+    "A fast shortlist of DJ headphones with short notes and a 'check current price' link to Amazon. "
+    "This no-API mode uses manual product details (name, summary, typical price range). "
+    "Images are optional and must be provided as URLs you have rights to use."
 )
 
 DEFAULT_KEYWORDS = "dj headphones"
 DEFAULT_MAX_PRICE_CENTS = 10000  # $100.00
 
 
-def _html_escape(s: str) -> str:
+def esc(s: str) -> str:
     return (s.replace("&", "&amp;")
              .replace("<", "&lt;")
              .replace(">", "&gt;")
@@ -25,37 +25,40 @@ def _html_escape(s: str) -> str:
              .replace("'", "&#39;"))
 
 
-def load_asins(path: str = "asin_list.json") -> List[str]:
+def load_products(path: str = "asin_list.json") -> List[Dict[str, str]]:
     data = json.loads(open(path, "r", encoding="utf-8").read())
-    out: List[str] = []
+    out: List[Dict[str, str]] = []
+    seen = set()
     for row in data:
         asin = (row.get("asin") or "").strip()
-        if asin and asin not in out:
-            out.append(asin)
+        if not asin or asin in seen:
+            continue
+        out.append({
+            "asin": asin,
+            "name": (row.get("name") or "").strip(),
+            "summary": (row.get("summary") or "").strip(),
+            "price_range": (row.get("price_range") or "").strip(),
+            "image_url": (row.get("image_url") or "").strip(),
+        })
+        seen.add(asin)
     return out
 
 
-def affiliate_dp_url(asin: str, partner_tag: str) -> str:
-    # Simple, robust DP URL with tracking tag
-    # Example: https://www.amazon.com/dp/B000AJIF4E?tag=yourtag-20
-    return f"https://www.amazon.com/dp/{asin}?tag={partner_tag}"
+def dp_url(asin: str, tag: str) -> str:
+    return f"https://www.amazon.com/dp/{asin}?tag={tag}"
 
 
-def affiliate_search_url(partner_tag: str, keywords: str = DEFAULT_KEYWORDS, max_price_cents: int = DEFAULT_MAX_PRICE_CENTS) -> str:
-    # Search for DJ headphones under $100.
-    # Note: "s=price-asc-rank" generally sorts low->high on Amazon search.
-    # We include tag for attribution.
-    from urllib.parse import quote_plus
+def search_url(tag: str, keywords: str = DEFAULT_KEYWORDS, max_price_cents: int = DEFAULT_MAX_PRICE_CENTS) -> str:
     return (
         "https://www.amazon.com/s?"
         f"k={quote_plus(keywords)}"
         f"&rh=p_36%3A-{max_price_cents}"
         "&s=price-asc-rank"
-        f"&tag={partner_tag}"
+        f"&tag={tag}"
     )
 
 
-HTML_TEMPLATE = """<!doctype html>
+HTML = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -64,23 +67,25 @@ HTML_TEMPLATE = """<!doctype html>
   <meta name="description" content="{desc}">
   <style>
     body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; background:#fafafa; color:#111; }}
-    header {{ max-width: 980px; margin: 0 auto; padding: 28px 16px 8px; }}
-    h1 {{ font-size: 28px; margin: 0 0 8px; }}
-    p {{ margin: 0 0 10px; line-height: 1.4; }}
+    header, main, footer {{ max-width: 980px; margin: 0 auto; padding: 18px 16px; }}
+    h1 {{ font-size: 28px; margin: 8px 0 8px; }}
+    p {{ margin: 6px 0; line-height: 1.45; }}
     .meta {{ color:#444; font-size: 14px; }}
-    main {{ max-width: 980px; margin: 0 auto; padding: 8px 16px 32px; }}
-    .card {{ background:white; border-radius: 12px; overflow:hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 14px; margin-bottom: 14px; }}
-    table {{ width: 100%; border-collapse: collapse; }}
-    th, td {{ padding: 12px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }}
-    th {{ text-align: left; font-size: 13px; color:#444; background:#f5f5f5; }}
-    td.buy {{ width: 160px; text-align: right; white-space:nowrap; }}
+    .card {{ background:white; border-radius: 14px; overflow:hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.06); padding: 14px; margin: 12px 0; }}
+    .grid {{ display:grid; grid-template-columns: 120px 1fr 170px; gap: 14px; align-items:center; }}
+    .imgwrap {{ width:120px; height:80px; border-radius: 12px; background:#f3f4f6; overflow:hidden; }}
+    .imgwrap img {{ width:100%; height:100%; object-fit:cover; display:block; }}
+    .name {{ font-weight: 750; font-size: 16px; margin: 0 0 4px; }}
+    .sub {{ color:#444; font-size: 14px; margin: 0 0 6px; }}
+    .price {{ font-weight: 750; font-size: 14px; margin: 0; }}
+    .btn {{ display:inline-block; padding: 10px 12px; border:1px solid #ddd; border-radius: 12px; background:#fff; font-weight: 700; text-align:center; }}
+    .btn:hover {{ background:#f7f7f7; text-decoration:none; }}
     a {{ color:#0b57d0; text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
-    .btn {{ display:inline-block; padding: 9px 12px; border:1px solid #ddd; border-radius: 10px; background:#fff; font-weight: 600; }}
-    .btn:hover {{ background:#f7f7f7; text-decoration:none; }}
-    .note {{ font-size: 14px; color:#444; }}
-    footer {{ max-width: 980px; margin: 0 auto; padding: 18px 16px 40px; color:#555; font-size: 13px; }}
-    footer a {{ color:#444; }}
+    @media (max-width: 760px) {{
+      .grid {{ grid-template-columns: 1fr; }}
+      .imgwrap {{ width:100%; height:180px; }}
+    }}
   </style>
 </head>
 <body>
@@ -92,24 +97,11 @@ HTML_TEMPLATE = """<!doctype html>
 
   <main>
     <div class="card">
-      <p class="note"><strong>Note:</strong> Live prices require Amazon Product Advertising API access. Until then, use the buttons below to view current prices on Amazon.</p>
-      <p><a class="btn" href="{search_url}" rel="nofollow sponsored">View Amazon results under $100 (price low→high)</a></p>
+      <p><strong>Note:</strong> Prices change constantly. “Typical price” is a manual guide. Use the button to check the current price on Amazon.</p>
+      <p><a class="btn" href="{search}" rel="nofollow sponsored">Browse Amazon under $100 (price low→high)</a></p>
     </div>
 
-    <div class="card">
-      <table>
-        <thead>
-          <tr>
-            <th>ASIN</th>
-            <th>Product link</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows}
-        </tbody>
-      </table>
-    </div>
+    {cards}
   </main>
 
   <footer>
@@ -121,44 +113,51 @@ HTML_TEMPLATE = """<!doctype html>
 """
 
 
-def render_rows(asins: List[str], partner_tag: str) -> str:
-    if not asins:
-        return '<tr><td colspan="3">No ASINs found. Add them to asin_list.json.</td></tr>'
-    out = []
-    for asin in asins:
-        url = affiliate_dp_url(asin, partner_tag)
-        out.append(
-            "<tr>"
-            f"<td>{_html_escape(asin)}</td>"
-            f'<td><a href="{_html_escape(url)}" rel="nofollow sponsored">Open product</a></td>'
-            f'<td class="buy"><a class="btn" href="{_html_escape(url)}" rel="nofollow sponsored">Check price</a></td>'
-            "</tr>"
-        )
-    return "\n".join(out)
+def card(p: Dict[str, str], tag: str) -> str:
+    asin = p["asin"]
+    name = p.get("name") or f"Product ({asin})"
+    summary = p.get("summary") or "Add a one-line note in asin_list.json."
+    price_range = p.get("price_range") or "(add a typical price range)"
+    img = p.get("image_url") or "assets/placeholder.svg"
+    url = dp_url(asin, tag)
+
+    return (
+        '<div class="card">'
+        '  <div class="grid">'
+        f'    <div class="imgwrap"><img src="{esc(img)}" alt="{esc(name)}"></div>'
+        '    <div>'
+        f'      <div class="name">{esc(name)}</div>'
+        f'      <div class="sub">{esc(summary)}</div>'
+        f'      <div class="price">Typical: {esc(price_range)}</div>'
+        f'      <div class="sub">ASIN: {esc(asin)}</div>'
+        '    </div>'
+        f'    <div><a class="btn" href="{esc(url)}" rel="nofollow sponsored">Check current price</a></div>'
+        '  </div>'
+        '</div>'
+    )
 
 
 def main() -> None:
-    partner_tag = os.environ.get("AMZ_PARTNER_TAG", "").strip()
-    if not partner_tag:
-        raise SystemExit("Missing AMZ_PARTNER_TAG. Set it as an environment variable or GitHub Actions secret.")
+    tag = os.environ.get("AMZ_PARTNER_TAG", "").strip()
+    if not tag:
+        raise SystemExit("Missing AMZ_PARTNER_TAG (set as GitHub Actions secret).")
 
-    asins = load_asins()
+    products = load_products()
     updated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    html = HTML_TEMPLATE.format(
-        title=_html_escape(PAGE_TITLE),
-        desc=_html_escape(PAGE_DESC),
-        h1=_html_escape(PAGE_TITLE),
-        pdesc=_html_escape(PAGE_DESC),
-        updated=updated,
-        rows=render_rows(asins, partner_tag),
-        search_url=_html_escape(affiliate_search_url(partner_tag)),
-    )
-    with open("index.html", "w", encoding="utf-8") as f:
-        f.write(html)
+    cards = "\n".join(card(p, tag) for p in products)
 
-    # Emit a simple JSON artifact for debugging
-    with open("products.json", "w", encoding="utf-8") as f:
-        json.dump({"asins": asins, "updated": updated}, f, indent=2)
+    html = HTML.format(
+        title=esc(PAGE_TITLE),
+        desc=esc(PAGE_DESC),
+        h1=esc(PAGE_TITLE),
+        pdesc=esc(PAGE_DESC),
+        updated=updated,
+        cards=cards,
+        search=esc(search_url(tag)),
+    )
+
+    open("index.html", "w", encoding="utf-8").write(html)
+    open("products.json", "w", encoding="utf-8").write(json.dumps({"products": products, "updated": updated}, indent=2))
 
 
 if __name__ == "__main__":
