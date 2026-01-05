@@ -1,21 +1,21 @@
-# DJ headphones shortlist (JSON-driven, image fixes)
+# Clone-and-scale affiliate shortlist template
 
-If you are seeing missing images, it is usually one of:
-- Hotlink protection by the image host
-- Mixed-content / redirects / blocked referrers
-- Intermittent CDN issues
+This repo builds a GitHub Pages product shortlist from **one file**: `site_config.json`.
 
-This build includes:
-- `onerror` fallback to a local placeholder
-- Optional image caching during build (recommended)
+## Edit only this file
+Open `site_config.json` and update:
+- `title`
+- `description`
+- `intro_paragraphs`
+- `meta_note`
+- `products` (list)
 
-## Recommended: Cache images during build
-This avoids hotlink protection and makes your site faster.
+Then run the GitHub Action (or wait for the daily schedule).
 
-1) In GitHub Actions secrets: set `AMZ_PARTNER_TAG`
-2) In the workflow, ensure `CACHE_IMAGES=1` (already set in this repo template)
+## Setup
+1) Repo Settings → Secrets and variables → Actions → add `AMZ_PARTNER_TAG` (example: `yourtag-20`)
+2) Actions → Daily rebuild → Run workflow
 
-The action will download images and commit them to `assets/img/`.
-
-## Editing products
-Edit `products_input.json` and commit.
+## Images
+The workflow caches images during the build (`CACHE_IMAGES=1`) to reduce broken images from hotlink blocking.
+If you prefer not to cache third‑party images, change `CACHE_IMAGES` to `"0"` in `.github/workflows/daily.yml`.

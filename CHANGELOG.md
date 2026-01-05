@@ -1,4 +1,4 @@
-## v5
-- Updated image URLs for items that were missing images on GitHub Pages.
-- Removed discontinued Allen & Heath Xone XD2-53 from the list.
-- Kept image caching during build (CACHE_IMAGES=1) so third-party hotlink blocking does not break the page.
+## v7
+- Consolidated site title/description/intro + product list into **one file**: `site_config.json`.
+- `build_page.py` now reads only `site_config.json`.
+- Removed `products_input.json` to reduce edit points when cloning to scale.
