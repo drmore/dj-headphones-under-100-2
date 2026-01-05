@@ -2,12 +2,23 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 
+import requests
+
 PAGE_TITLE = "DJ headphones — shortlist"
-PAGE_DESC = "A simple shortlist of DJ headphones with photos, short notes, and Amazon links."
+PAGE_DESC = "A shortlist of DJ headphones with photos, short notes, and Amazon links."
+
 INPUT_JSON = "products_input.json"
+ASSETS_DIR = Path("assets")
+IMG_DIR = ASSETS_DIR / "img"
+PLACEHOLDER = "assets/placeholder.svg"
+
+# If CACHE_IMAGES=1, we will download remote images during the GitHub Action build
+CACHE_IMAGES = os.environ.get("CACHE_IMAGES", "0").strip() in {"1", "true", "TRUE", "yes", "YES"}
 
 
 def esc(s: str) -> str:
@@ -44,6 +55,49 @@ def load_products(path: str = INPUT_JSON) -> list[dict]:
         })
         seen.add(asin)
     return out
+
+
+def _safe_ext(url: str, content_type: str | None) -> str:
+    if content_type:
+        ct = content_type.split(";")[0].strip().lower()
+        if ct == "image/png":
+            return ".png"
+        if ct in {"image/jpeg", "image/jpg"}:
+            return ".jpg"
+        if ct == "image/webp":
+            return ".webp"
+        if ct == "image/gif":
+            return ".gif"
+    # fallback from URL
+    m = re.search(r"\.(png|jpe?g|webp|gif)(?:\?|$)", url.lower())
+    if m:
+        return "." + m.group(1).replace("jpeg", "jpg")
+    return ".img"
+
+
+def cache_image(asin: str, remote_url: str) -> str:
+    """Download remote image to assets/img and return local path. If fails, return remote_url."""
+    if not remote_url:
+        return PLACEHOLDER
+
+    IMG_DIR.mkdir(parents=True, exist_ok=True)
+
+    headers = {
+        # Some CDNs block unknown agents; use a common UA
+        "User-Agent": "Mozilla/5.0 (compatible; static-site-builder/1.0)",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    }
+
+    try:
+        r = requests.get(remote_url, headers=headers, timeout=20)
+        if r.status_code != 200 or not r.content:
+            return remote_url  # fall back to hotlink
+        ext = _safe_ext(remote_url, r.headers.get("Content-Type"))
+        local = IMG_DIR / f"{asin}{ext}"
+        local.write_bytes(r.content)
+        return str(local).replace("\\", "/")
+    except Exception:
+        return remote_url  # fall back to hotlink
 
 
 HTML = """<!doctype html>
@@ -104,8 +158,20 @@ HTML = """<!doctype html>
 
 def card(p: dict, tag: str) -> str:
     url = with_affiliate_tag(p["amazon_url"], tag)
-    img = p.get("image_url") or ""
-    img_html = f'<img src="{esc(img)}" alt="{esc(p["name"])}" loading="lazy" referrerpolicy="no-referrer">' if img else ''
+
+    src = p.get("image_url") or ""
+    if CACHE_IMAGES:
+        src = cache_image(p["asin"], src)
+
+    if not src:
+        src = PLACEHOLDER
+
+    # Always include onerror fallback to placeholder
+    img_html = (
+        f'<img src="{esc(src)}" alt="{esc(p["name"])}" loading="lazy" '
+        f'referrerpolicy="no-referrer" onerror="this.onerror=null;this.src=\'{PLACEHOLDER}\';">'
+    )
+
     return (
         '<div class="card">'
         f'  <div class="img">{img_html}</div>'
@@ -138,8 +204,8 @@ def main() -> None:
         updated=updated,
         cards=cards,
     )
-    open("index.html", "w", encoding="utf-8").write(html)
-    open("products.json", "w", encoding="utf-8").write(json.dumps({"products": products, "updated": updated}, indent=2))
+    Path("index.html").write_text(html, encoding="utf-8")
+    Path("products.json").write_text(json.dumps({"products": products, "updated": updated}, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":

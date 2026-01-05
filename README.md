@@ -1,11 +1,21 @@
-# DJ headphones shortlist (JSON-driven, no Amazon API)
+# DJ headphones shortlist (JSON-driven, image fixes)
 
-This build renders product cards (name, image, description) from `products_input.json`,
-and appends your Amazon Associates tag to each product link at build time.
+If you are seeing missing images, it is usually one of:
+- Hotlink protection by the image host
+- Mixed-content / redirects / blocked referrers
+- Intermittent CDN issues
 
-## Setup
-- Add GitHub Secret: `AMZ_PARTNER_TAG` (e.g. `yourtag-20`)
-- Run Actions → Daily rebuild
+This build includes:
+- `onerror` fallback to a local placeholder
+- Optional image caching during build (recommended)
 
-## Edit products
-Edit `products_input.json` and commit. The site rebuilds.
+## Recommended: Cache images during build
+This avoids hotlink protection and makes your site faster.
+
+1) In GitHub Actions secrets: set `AMZ_PARTNER_TAG`
+2) In the workflow, ensure `CACHE_IMAGES=1` (already set in this repo template)
+
+The action will download images and commit them to `assets/img/`.
+
+## Editing products
+Edit `products_input.json` and commit.
