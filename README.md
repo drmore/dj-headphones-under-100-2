@@ -1,19 +1,11 @@
-# DJ headphones shortlist (No-API, human-friendly)
+# DJ headphones shortlist (JSON-driven, no Amazon API)
 
-This version is intentionally **human-readable** without Amazon PA-API access.
+This build renders product cards (name, image, description) from `products_input.json`,
+and appends your Amazon Associates tag to each product link at build time.
 
-## What you can show (compliant)
-- Product name (manual)
-- One-line summary (manual)
-- Typical price range (manual)
-- Optional image URL (ONLY if you have rights to use the image)
+## Setup
+- Add GitHub Secret: `AMZ_PARTNER_TAG` (e.g. `yourtag-20`)
+- Run Actions → Daily rebuild
 
-## What you should NOT do without PA-API
-- Scrape Amazon for titles/images/prices
-- Hotlink/copy Amazon images without permission
-
-## Update content
-Edit `asin_list.json` and fill in `name`, `summary`, `price_range`.
-Optionally add `image_url` if you have a licensed image.
-
-Then run the GitHub Action (workflow_dispatch) or wait for daily rebuild.
+## Edit products
+Edit `products_input.json` and commit. The site rebuilds.
